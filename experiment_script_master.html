@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-	<title> preparation</title>
+	<title> pilot experiment</title>
 	<script src="jspsych/jspsych.js"></script>
 	<script src="jspsych/plugins/jspsych-html-keyboard-response.js"></script>
 	<script src="jspsych/plugins/jspsych-survey-text.js"></script>
@@ -12,8 +12,8 @@
 	<script src="instructions.js"></script>
 	<link href="jspsych/css/jspsych.css" rel="stylesheet">
 	<style>
-		#leftPrompt{position:absolute; bottom:30px; left:330px; height:20; width:40; border:3px solid #000000;}
-		#rightPrompt{position:absolute; bottom:30px; right:330px; height:20; width:40;border:3px solid #000000;}
+		#leftPrompt{position:absolute; bottom:200px; left:600px; font-size: 30px;}
+		#rightPrompt{position:absolute; bottom:200px; right:600px; font-size: 30px;}
 		#taskCue{height:120px; width:150px; border: 3px solid #000000;}
 		#instructionFrame{width:800px; text-align: left; line-break: normal;}		
 	</style>
@@ -59,7 +59,7 @@
 	const livingStimList = stimulusList.filter(function(item){
 		return item.semanticRule == "living"
 	});
-	console.log(sweetStimList)
+	// console.log(sweetStimList)
 
 
 	const blockDesign = ['PB1', 'PB2', 'PB3', 'PB4', 'PB5']
@@ -75,7 +75,7 @@
 	var timeline = [];
 
 
-/*
+
 	///// some survey about demographic information /////
 
 	var subjectID = jsPsych.randomization.randomID(8);
@@ -113,7 +113,7 @@
 	};
 	timeline.push(language_trial)
 
-*/
+
 
 	/*  Defining the practiced and novel tasks */
 
@@ -122,8 +122,8 @@
 
 	const pracLogicalRules = jsPsych.randomization.shuffle(logicalRuleFullList);
 	const pracSemanticRules = jsPsych.randomization.shuffle(semanticRuleFullList);
-	console.log(pracLogicalRules)
-	console.log(pracSemanticRules)
+	console.log('the logical rule practice sequence', pracLogicalRules)
+	console.log('the semantic rule practice sequence', pracSemanticRules)
 
 	const pracTasks = [];
 	for (var i=0; i<6; i++) {
@@ -154,8 +154,8 @@
 	}
 	console.log("all the novel tasks are:", novelTasks)
 
-	allTasks = pracTasks.concat(novelTasks);
-	console.log(allTasks)	
+	allTasks = pracTasks.concat(novelTasks); // copy the value instead of the reference
+	// console.log(allTasks)	
 
 
 	/* Useful functions across all experimental blocks */
@@ -166,11 +166,24 @@
 			var rule = allTasks.find(element => element.taskID == idArray[i]);
 			ruleArray.push(rule);
 		}
-		return ruleArray
+		return ruleArray // objects share the same reference of alltasks
 	}
 	// console.log(genRuleArray([2,4,8,36]))
 
+	
+	function genBalResp(){
+		// the function to generate balanced response(true/false) for a certain block(60 trials)
+		var trueList = Array(30).fill(true);
+		var falseList = Array(30).fill(false);
+		var fullList = trueList.concat(falseList);
+		fullList = jsPsych.randomization.shuffle(fullList);
+		return fullList	
+	}
 
+	// console.log(genBalResp())
+
+
+/*
 	function genStimPairArray(ruleArray) {
 
 		// the function receive the input of array of rules(logical and semantic) 
@@ -213,6 +226,100 @@
 	}
 	// console.log(genStimPairArray(genRuleArray([2,4,8,36])))
 
+*/
+	function genStimPairArray(ruleArray, respArray) {
+
+		// the function receive the input of array of rules(logical and semantic) 
+		// return an array containing objects, each object is a stimulus of one trial
+		// response condition: 1 (Yes  No),    2 (No  Yes).
+
+		var stimArray = []; 
+		for (var i = 0; i < ruleArray.length; i++) {
+			var logicalRule = ruleArray[i].logical;
+			var semanticRule = ruleArray[i].semantic;
+			var response = respArray[i];
+
+			var trialObject = {};
+			var sample = genStimPair(logicalRule, semanticRule, response); // return array including 2 stim objects from the JSON file
+			// console.log(sample);
+			var responseCon = jsPsych.randomization.sampleWithoutReplacement([1,2],1)[0];
+
+			trialObject.logical = logicalRule;
+			trialObject.semantic = semanticRule;
+			trialObject.taskID = ruleArray[i].taskID; // keep in mind that some of the tasks do not have a ID in the testing block rulearray
+			
+			if (trialObject.taskID < 7) {
+				trialObject.prac_or_novel = "Practiced Task";
+			} else {
+				trialObject.prac_or_novel = "Novel Task";
+			};
+
+			trialObject.firstStim = sample[0].word;
+			trialObject.firstAnswer = sample[0].answer;
+			trialObject.secondStim = sample[1].word;
+			trialObject.secondAnswer = sample[1].answer;
+			trialObject.responseCon = responseCon;
+			trialObject.rightPrompt = genPrompt(responseCon).rightPrompt;
+			trialObject.leftPrompt = genPrompt(responseCon).leftPrompt;
+
+			trialObject.correctAnswer = response;
+			trialObject.correctKey = correctKeyPress(trialObject);
+			stimArray.push(trialObject)
+		}
+
+		return stimArray
+	}
+
+
+	function genStimPair(logical, semantic, response) {
+		samplePair = [];
+		switch(logical) {
+			case "both":
+				if (response == true) {samplePair = pickSample(1, semantic)} else {samplePair = pickSample(jsPsych.randomization.sampleWithoutReplacement([2,3,4],1)[0], semantic)};
+				break; 
+			case "at least one":
+				if (response == true) {samplePair = pickSample(jsPsych.randomization.sampleWithoutReplacement([1,2,3],1)[0], semantic)} else {samplePair = pickSample(4, semantic)};
+				break;
+			case "neither":
+				if (response == true) {samplePair = pickSample(4, semantic)} else {samplePair = pickSample(jsPsych.randomization.sampleWithoutReplacement([1,2,3],1)[0], semantic)};
+				break; 
+			case "first":
+				if (response == true) {samplePair = pickSample(jsPsych.randomization.sampleWithoutReplacement([1,2],1)[0], semantic)} else {samplePair = pickSample(jsPsych.randomization.sampleWithoutReplacement([3,4],1)[0], semantic)};
+				break; 
+			case "second":
+				if (response == true) {samplePair = pickSample(jsPsych.randomization.sampleWithoutReplacement([1,3],1)[0], semantic)} else {samplePair = pickSample(jsPsych.randomization.sampleWithoutReplacement([2,4],1)[0], semantic)};
+				break; 
+			case "different":
+				if (response == true) {samplePair = pickSample(jsPsych.randomization.sampleWithoutReplacement([2,3],1)[0], semantic)} else {samplePair = pickSample(jsPsych.randomization.sampleWithoutReplacement([1,4],1)[0], semantic)};
+				break;
+		}
+		return samplePair
+	}
+
+	
+	function pickSample(conditionID, semantic) {
+		// pick a sample pair(array of 2 objects) based on the semantic rule 
+		var samplePair = [];
+		switch(conditionID) {
+			case 1: // true and true for the stim pair response
+				samplePair = jsPsych.randomization.sampleWithoutReplacement(subStimList(semantic).filter(element => element.answer == true),2);
+				break;
+			case 2: // true and false for the stim pair response
+				firstSample = jsPsych.randomization.sampleWithoutReplacement(subStimList(semantic).filter(element => element.answer == true),1)[0];
+				secondSample = jsPsych.randomization.sampleWithoutReplacement(subStimList(semantic).filter(element => element.answer == false),1)[0];
+				samplePair = [firstSample, secondSample];
+				break;
+			case 3: // false and true for the stim pair response
+				firstSample = jsPsych.randomization.sampleWithoutReplacement(subStimList(semantic).filter(element => element.answer == false),1)[0];
+				secondSample = jsPsych.randomization.sampleWithoutReplacement(subStimList(semantic).filter(element => element.answer == true),1)[0];
+				samplePair = [firstSample, secondSample];
+				break;			
+			case 4:// false and false for the stim pair response
+				samplePair = jsPsych.randomization.sampleWithoutReplacement(subStimList(semantic).filter(element => element.answer == false),2);
+				break;
+		}
+		return samplePair
+	}
 
 
 	function subStimList (semanticRule) {
@@ -263,17 +370,17 @@
 			case "first":
 				if (trialObject.firstAnswer) {
 					correctAnswer = true
-				}
+				};
 				break;
 			case "second":
 				if (trialObject.secondAnswer) {
 					correctAnswer = true
-				}
+				};
 				break;
 			case "different":
 				if (trialObject.firstAnswer != trialObject.secondAnswer) {
 					correctAnswer = true
-				}
+				};
 				break;
 		}
 		return correctAnswer
@@ -343,12 +450,12 @@
 	}
 
 
-	function genFixation(){
+	function genFixation(duration){
 		var fixationObject = {
             type: 'html-keyboard-response',
             stimulus: '<span style="font-size:40px;">+</span>',
             choices: jsPsych.NO_KEYS,
-            trial_duration: 2000,
+            trial_duration: duration,
             data: {
                 trial_part: 'fixation', 
             }
@@ -371,7 +478,7 @@
 
 	function genGraphPrompt(prompt) {
 		var graphPrompt = '<span style="color:red;">&#10006</span>';
-		if (prompt == true) {
+		if (prompt == "True") {
 			graphPrompt = '<span style="color:green;">&#10004</span>';
 		}
 		return graphPrompt
@@ -399,7 +506,7 @@
 		}
 
 		// show fixation
-		timeline.push(genFixation())
+		timeline.push(genFixation(2000))
 
 		// show task cue for the prac block(6 individual task prac block)
 		switch (blockType) {
@@ -408,7 +515,7 @@
 					type: 'html-keyboard-response',
 					stimulus: `<div id= taskCue><p> ${stimPairArray[0].logical} </p><p> ${stimPairArray[0].semantic} </p></div>`,
 					choices: ['spacebar'],
-					trial_duration: 10000, // 10 seconds
+					// trial_duration: 10000, // 10 seconds
 					data: {
 						block: blockID,
 						prac_or_novel: stimPairArray[0].prac_or_novel,
@@ -453,7 +560,7 @@
 					}
 
 					timeline.push(tasktype_cue)
-					timeline.push(genFixation())
+					timeline.push(genFixation(2000))
 					break;
 				case "testNocue":
 					var tasktype_cue = {
@@ -469,7 +576,7 @@
 					}
 
 					timeline.push(tasktype_cue)
-					timeline.push(genFixation())
+					timeline.push(genFixation(2000))
 					break;			
 		}
 			// show task cue for pracMix, testCue and testNocue blocks
@@ -478,7 +585,7 @@
 					type: 'html-keyboard-response',
 					stimulus: `<div id= taskCue><p> ${stimPairArray[i].logical} </p><p> ${stimPairArray[i].semantic} </p></div>`,
 					choices: ['spacebar'],
-					trial_duration: 10000, // 10 seconds
+					// trial_duration: 10000, // 10 seconds
 					data: {
 						block: blockID,
 						prac_or_novel: stimPairArray[i].prac_or_novel,
@@ -492,7 +599,7 @@
 
 
 			// show fixation
-			timeline.push(genFixation())
+			// timeline.push(genFixation(1000))
 
 			// show stimuli
 			var stimulus = {
@@ -500,8 +607,8 @@
 				stimulus: '<p><span style = "font-size:20px;">' + stimPairArray[i].firstStim + '</span></p>' +
 				          '<p><span style = "font-size:20px;">' + stimPairArray[i].secondStim + '</span></p>' ,
 				choices: ['d','k'],
-				prompt: '<div id = "leftPrompt">' + stimPairArray[i].leftPrompt + '</div>' + 
-				        '<div id = "rightPrompt">' + stimPairArray[i].rightPrompt + '</div>',
+				prompt: '<div id = "leftPrompt">' + genGraphPrompt(stimPairArray[i].leftPrompt) + '</div>' + 
+				        '<div id = "rightPrompt">' + genGraphPrompt(stimPairArray[i].rightPrompt) + '</div>',
 				stimulus_duration: 5000,
 				trial_duration:5000,
 				data: {
@@ -546,7 +653,7 @@
 			            return feedback_text;
 			            },
 			        choices: jsPsych.NO_KEYS,
-			        trial_duration: 2000
+			        trial_duration: 1000
 			        }
 
 			        timeline.push(feedback)
@@ -559,7 +666,7 @@
 		}
 	}
 
-/*
+
 
 	///////////////////// Overall instruction ////////////////////
     var overallInstructions = {
@@ -570,18 +677,21 @@
     };
     timeline.push(overallInstructions)	
 
-
+  
 	/////////////////// Practice Block No.1 /////////////////////
 	var firstPracRuleArray = genRepArray(pracTasks[0], nTrialsBlock);
-	var firstPracBlock = genStimPairArray(firstPracRuleArray);
+	var respList = genBalResp();
+	// console.log(respList)
+	
+	var firstPracBlock = genStimPairArray(firstPracRuleArray, respList);
 	console.log("the first practice block consist of the following trials:", firstPracBlock)
 
-    genBlock(firstPracBlock,'prac','prac_1')
+	genBlock(firstPracBlock,'prac','prac_1')
 
 
     ////////////////// Practice Block No.2 ///////////////////////
     var secondPracRuleArray = genRepArray(pracTasks[1], nTrialsBlock);
-    var secondPracBlock = genStimPairArray(secondPracRuleArray);
+    var secondPracBlock = genStimPairArray(secondPracRuleArray, genBalResp());
     console.log("the second practice block consist of the following trials:", secondPracBlock)
     
     genBlock(secondPracBlock, 'prac', 'prac_2')
@@ -589,7 +699,7 @@
 
     ////////////////// Practice Block No.3 ///////////////////////
     var thirdPracRuleArray = genRepArray(pracTasks[2], nTrialsBlock);
-    var thirdPracBlock = genStimPairArray(thirdPracRuleArray);
+    var thirdPracBlock = genStimPairArray(thirdPracRuleArray, genBalResp());
     console.log("the third practice block consist of the following trials:", thirdPracBlock)
     
     genBlock(thirdPracBlock, 'prac', 'prac_3')
@@ -597,27 +707,27 @@
 
     ////////////////// Practice Block No.4 ///////////////////////
     var fourthPracRuleArray = genRepArray(pracTasks[3], nTrialsBlock);
-    var fourthPracBlock = genStimPairArray(fourthPracRuleArray);
+    var fourthPracBlock = genStimPairArray(fourthPracRuleArray, genBalResp());
     console.log("the fourth practice block consist of the following trials:", fourthPracBlock)
     
     genBlock(fourthPracBlock, 'prac', 'prac_4')
 
+
     ////////////////// Practice Block No.5 ///////////////////////
     var fifthPracRuleArray = genRepArray(pracTasks[4], nTrialsBlock);
-    var fifthPracBlock = genStimPairArray(fifthPracRuleArray);
+    var fifthPracBlock = genStimPairArray(fifthPracRuleArray, genBalResp());
     console.log("the fifth practice block consist of the following trials:", fifthPracBlock)
     
     genBlock(fifthPracBlock, 'prac', 'prac_5')
 
 
-    ////////////////// Practice Block No.2 ///////////////////////
+    ////////////////// Practice Block No.6 ///////////////////////
     var sixthPracRuleArray = genRepArray(pracTasks[5], nTrialsBlock);
-    var sixthPracBlock = genStimPairArray(sixthPracRuleArray);
+    var sixthPracBlock = genStimPairArray(sixthPracRuleArray, genBalResp());
     console.log("the sixth practice block consist of the following trials:", sixthPracBlock)
     
     genBlock(sixthPracBlock, 'prac', 'prac_6')
     
-*/
 
     ////////////////// Practice Block No.7 ///////////////////////
     const pracTaskId = [1,2,3,4,5,6];
@@ -627,37 +737,30 @@
     var firstMixPracRuleArray = genRuleArray(firstMixPracId);
     // console.log(neighborRuleOverlap(firstMixPracRuleArray))
 
-    var firstMixPracBlock = genStimPairArray(firstMixPracRuleArray);
+    var firstMixPracBlock = genStimPairArray(firstMixPracRuleArray, genBalResp());
     console.log("the first mixed practice block consist of the following trials:", firstMixPracBlock);
+    
     genBlock(firstMixPracBlock, 'pracMix', 'pracMix_1')
 
 
-    ////////////////// Test Block No.1 ///////////////////////////
-	var overallTestInstruction = {
-        type: 'instructions',
-        pages: testMainInstruction,
-        show_clickable_nav: true,
-        post_trial_gap: 1000
-    };
-    timeline.push(overallTestInstruction)	
+    ///////////////////////////////////////////////////////////////
+    ////////////////////// Testing Section ////////////////////////
+    ///////////////////////////////////////////////////////////////
+	
+	/* general configuration */
 
-
+	var testPracId = jsPsych.randomization.repeat(pracTaskId, 5);
+	
 	var novelTaskId = [];
 	for (i=0; i<novelTasks.length; i++) {
 		novelTaskId.push(i+7) 
-	}
-	// console.log(novelTaskId)
-
-	var testPracId = jsPsych.randomization.repeat(pracTaskId, 5);
+	}	
+	
 	var testFullId = testPracId.concat(novelTaskId);
-	var firstTestId = jsPsych.randomization.shuffleNoRepeats(testFullId);
-	// console.log(firstTestId)
-
-
 
 	var miniblocks = [[], [], [], [], []];
-	miniblocks = miniblocks.map(element => element.concat(pracTasks.slice())); // include the practiced tasks in each of the mini block
-	miniblocks = miniblocks.map(element => element.concat([{},{},{},{},{},{}]));
+	miniblocks = miniblocks.map(element => element.concat(pracTasks.slice()));   // include the practiced tasks in each of the mini block
+	miniblocks = miniblocks.map(element => element.concat([{},{},{},{},{},{}])); // include the novel tasks
 
 	for (i=0; i<miniblocks.length; i++){
 
@@ -681,28 +784,26 @@
 	}
 
 	for (i = 0; i<miniblocks.length; i++) {
-		miniblocks[i] = jsPsych.randomization.shuffleNoRepeats(miniblocks[i]);
+		miniblocks[i] = jsPsych.randomization.shuffleNoRepeats(miniblocks[i]); // shuffle within each miniblock
 	}
 
-	console.log(miniblocks)
-
-	// console.log(pracTasks[(6-6+1+i) % 6].semantic)
 	// console.log(miniblocks)
-	// miniblockShuffle = jsPsych.randomization.shuffleNoRepeats(miniblocks[0]);
-	// console.log(miniblockShuffle)
-	// console.log(neighborRuleOverlap(miniblocks[0]))
-	// console.log(neighborRuleOverlap(miniblockShuffle))
-
-	// var disRuleArray = genDisRuleArray(miniblockShuffle);
-	// console.log(disRuleArray)
 
 	function genDisTestBlock(shuffledMiniBlocks) {
-		var disMiniBlocks = [[], [], [], [], []];
-		for (i=0; i < disMiniBlocks.length; i++) {
-			disMiniBlocks[i] = genDisRuleArray(shuffledMiniBlocks[i]);
+		var disMiniBlocks_aux = [[], [], [], [], []];
+		for (i=0; i < disMiniBlocks_aux.length; i++) {
+			disMiniBlocks_aux[i] = genDisRuleArray(shuffledMiniBlocks[i]);
 		};
-		var disTestBlock = [].concat.apply([], disMiniBlocks);
-		return disTestBlock
+		var disTestBlock_aux = [].concat.apply([], disMiniBlocks_aux); // concatenate the whole test block
+
+        // to avoid the rule overlapping between the last rule of the previous mini block and the first rule of the next mini block
+		var nshuffle = 0;
+		while (neighborRuleOverlap(disTestBlock_aux) == true && nshuffle < 120) {
+			disMiniBlocks_aux = jsPsych.randomization.shuffleNoRepeats(disMiniBlocks_aux);
+			disTestBlock_aux = [].concat.apply([], disMiniBlocks_aux);
+			nshuffle += 1;
+		}
+		return disTestBlock_aux
 	}
 
 
@@ -752,11 +853,32 @@
 	//                          {logical: "first", semantic:"loud"}, 
 	//                          {logical: "either", semantic:"sweet"}, 
 	//                          {logical: "neither", semantic:"soft"}];
-	// console.log(neighborRuleOverlap(testOverlapArray1))
+	// console.log(neighborRuleOverlap(testOverlapArray1))		
+
+
+	function saveData(name, data){
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', 'write_data.php'); // 'write_data.php' is the path to the php file.
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        xhr.send(JSON.stringify({filename: name, filedata: data}));
+    }
+    
+    ////////////* Testing starts *///////////////
+
+	var overallTestInstruction = {
+        type: 'instructions',
+        pages: testMainInstruction,
+        show_clickable_nav: true,
+        post_trial_gap: 1000
+    };
+    timeline.push(overallTestInstruction)	
+
+
+	////////////* Testing block No.1 *///////////////
+
 	var firstTestRuleArray = genDisTestBlock(jsPsych.randomization.shuffleNoRepeats(miniblocks));
-	// var firstTestRuleArray = genRuleArray(firstTestId);
-	console.log(firstTestRuleArray)
-	var firstTestBlock = genStimPairArray(firstTestRuleArray);
+	// console.log(firstTestRuleArray)
+	var firstTestBlock = genStimPairArray(firstTestRuleArray, genBalResp());
 	// console.log(firstTestRuleArray)
 	console.log("the first test block consist of the following trials", firstTestBlock)
 	genBlock(firstTestBlock, testSeq[0], 'test_1')
@@ -764,26 +886,23 @@
 
 	////////////////// Test Block No.2 ////////////////////////////
 
-	var secondTestId = jsPsych.randomization.shuffleNoRepeats(testFullId);
-	var secondTestRuleArray = genRuleArray(secondTestId);
-	var secondTestBlock = genStimPairArray(secondTestRuleArray);
+	var secondTestRuleArray = genDisTestBlock(jsPsych.randomization.shuffleNoRepeats(miniblocks));
+	var secondTestBlock = genStimPairArray(secondTestRuleArray, genBalResp());
 	console.log("the second test block consist of the following trials", secondTestBlock)
 	genBlock(secondTestBlock, testSeq[1], 'test_2');
 
 	////////////////// Test Block No.3 ////////////////////////////
 
-	var thirdTestId = jsPsych.randomization.shuffleNoRepeats(testFullId);
-	var thirdTestRuleArray = genRuleArray(thirdTestId);
-	var thirdTestBlock = genStimPairArray(thirdTestRuleArray);
+	var thirdTestRuleArray = genDisTestBlock(jsPsych.randomization.shuffleNoRepeats(miniblocks));
+	var thirdTestBlock = genStimPairArray(thirdTestRuleArray, genBalResp());
 	console.log("the third test block consist of the following trials", thirdTestBlock)
 	genBlock(thirdTestBlock, testSeq[2], 'test_3');
 
 
 	///////////////////// Test Block No.4 ///////////////////////////
 
-	var fourthTestId = jsPsych.randomization.shuffleNoRepeats(testFullId);
-	var fourthTestRuleArray = genRuleArray(fourthTestId);
-	var fourthTestBlock = genStimPairArray(fourthTestRuleArray);
+	var fourthTestRuleArray = genDisTestBlock(jsPsych.randomization.shuffleNoRepeats(miniblocks));
+	var fourthTestBlock = genStimPairArray(fourthTestRuleArray, genBalResp());
 	console.log("the fourth test block consist of the following trials", fourthTestBlock)
 	genBlock(fourthTestBlock, testSeq[3], 'test_4');
 
